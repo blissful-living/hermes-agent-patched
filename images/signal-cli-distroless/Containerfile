@@ -1,0 +1,39 @@
+# signal-cli's official native binary on Google's distroless Debian 13 base:
+# glibc, zlib, OpenSSL, CA certificates and the C++ runtime, with no shell and
+# no package manager. The binary itself needs only libc and libz, but at run
+# time it extracts libsignal's JNI library to /tmp, and that library needs
+# libstdc++ and libgcc_s, which the cc variant of distroless adds.
+#
+# BASE is the distroless tag; the publish workflow resolves it to the current
+# digest at build time and records that digest, so a new distroless build
+# (Google rebuilds it as Debian ships fixes) triggers a rebuild. The signal-cli
+# release is pinned by digest; Renovate proposes new releases.
+ARG BASE=gcr.io/distroless/cc-debian13:nonroot
+
+FROM ghcr.io/asamk/signal-cli:0.14.8-native@sha256:a1dfebf08f0a3ea586153911c8ed3954faf3a32ecb2b19acd2115fe8b1cc7a53 AS upstream
+
+# An empty, private directory for the default configuration path; distroless
+# has no shell to create it.
+RUN mkdir -p -m 0700 /tmp/config/signal-cli
+
+FROM ${BASE}
+
+LABEL org.opencontainers.image.title="signal-cli-distroless" \
+      org.opencontainers.image.description="Unofficial image of signal-cli's native binary on a distroless Debian 13 base. Not affiliated with the signal-cli project." \
+      org.opencontainers.image.licenses="GPL-3.0-only" \
+      org.opencontainers.image.vendor="Blissful Living Foundation" \
+      org.opencontainers.image.url="https://github.com/blissful-living/hermes-agent-patched" \
+      org.opencontainers.image.source="https://github.com/blissful-living/hermes-agent-patched"
+
+COPY --from=upstream /usr/bin/signal-cli /usr/bin/signal-cli
+
+# Owned by the distroless nonroot user and closed to others, so a named volume
+# mounted here starts out writable and private. Copying the parent's contents
+# keeps the directory's own mode, which copying the directory itself does not.
+COPY --from=upstream --chown=65532:65532 /tmp/config/ /var/lib/
+
+# Fails the build if the binary cannot run on this base.
+RUN ["/usr/bin/signal-cli", "--version"]
+
+USER 65532:65532
+ENTRYPOINT ["/usr/bin/signal-cli", "--config=/var/lib/signal-cli"]

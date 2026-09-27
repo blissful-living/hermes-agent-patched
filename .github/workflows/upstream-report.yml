@@ -1,0 +1,67 @@
+# Reports, every day, what a rebuild cannot fix in the published images, as
+# issues in this repository: HIGH and CRITICAL vulnerabilities with a fix
+# available in software that Hermes or signal-cli bundles, and a bundled
+# Chromium older than Chrome stable. Each has one issue, updated every day and
+# closed once the finding is gone. Nothing is built or published; the
+# published images are read from the record on the `state` branch.
+
+name: upstream report
+
+on:
+  schedule:
+    - cron: "7 14 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out the record of the published images
+        id: state
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: state
+          path: state
+          persist-credentials: false
+
+      - name: Vulnerabilities only upstream can fix
+        if: steps.state.outcome == 'success'
+        run: |
+          set -euo pipefail
+          scripts/upstream-findings.sh state > upstream.md
+          cat upstream.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Bundled Chromium against Chrome stable
+        if: steps.state.outcome == 'success'
+        run: |
+          set -euo pipefail
+          : > chromium.md
+          bundled=$(cat state/hermes-agent-patched/chromium-version 2>/dev/null || true)
+          stable=$(scripts/chrome-stable.sh)
+          echo "## Chromium: bundled \`${bundled:-unknown}\`, Chrome stable \`$stable\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$bundled" ] && [ "$(printf '%s\n%s\n' "$bundled" "$stable" | sort -V | tail -n 1)" != "$bundled" ]; then
+            image=$(cat state/hermes-agent-patched/image)
+            echo "The published Hermes image (\`$image\`) bundles Chromium $bundled; Chrome stable is $stable. Hermes updates its bundled Chromium only in a new release, and Chrome stable releases usually include security fixes." > chromium.md
+          fi
+
+      - name: Track issues that need an upstream release
+        if: steps.state.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          scripts/track-issue.sh "Upstream vulnerabilities" upstream.md \
+            "HIGH and CRITICAL vulnerabilities with a fix available, in application and language packages that only a new upstream release can update. Refreshed daily."
+          scripts/track-issue.sh "Bundled Chromium is behind Chrome stable" chromium.md

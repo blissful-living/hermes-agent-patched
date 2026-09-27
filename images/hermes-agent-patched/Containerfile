@@ -1,0 +1,25 @@
+# The official Hermes Agent release with Debian 13's pending updates applied.
+# The release image never runs apt-get upgrade and its build reuses cached
+# layers, so its Debian packages can be months older than the release itself.
+# The upstream image is pinned by digest; Renovate proposes new releases.
+#
+# Everything Hermes pins stays as it is: Node.js, Chromium, its own SQLite
+# library and its Python and JavaScript dependencies are installed outside
+# Debian's package manager and change only with a new Hermes release.
+FROM nousresearch/hermes-agent:v2026.9.24@sha256:fca358f12efd65bfaaca05884166f15c0e2788375ca30d77061ac1ebc96452b7
+
+LABEL org.opencontainers.image.title="hermes-agent-patched" \
+      org.opencontainers.image.description="Unofficial Hermes Agent image with Debian's pending updates applied. Not affiliated with Nous Research." \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="Blissful Living Foundation" \
+      org.opencontainers.image.url="https://github.com/blissful-living/hermes-agent-patched" \
+      org.opencontainers.image.source="https://github.com/blissful-living/hermes-agent-patched"
+
+# The upstream image starts as root (s6-overlay drops each service to the
+# hermes user), so the upgrade runs as root too. --with-new-pkgs lets an update
+# that needs a new dependency through instead of holding it back.
+USER root
+RUN apt-get -o Acquire::Retries=3 update \
+ && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -y --with-new-pkgs upgrade \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*

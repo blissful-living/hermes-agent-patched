@@ -1,0 +1,8 @@
+.DS_Store
+# Files the publish workflow writes into its workspace.
+/new-state/
+/image-archives/
+/state/
+*.spdx.json
+*.trivy.json
+*.dpkg-status

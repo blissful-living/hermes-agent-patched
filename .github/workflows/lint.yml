@@ -1,0 +1,39 @@
+# Lints the workflows with actionlint, which also runs ShellCheck on their
+# run: blocks, and the scripts with ShellCheck. Both run from images pinned by
+# digest, with only the repository mounted.
+
+name: lint
+
+on:
+  pull_request:
+    paths:
+      - ".github/**"
+      - "scripts/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/**"
+      - "scripts/**"
+
+permissions: {}
+
+env:
+  ACTIONLINT_IMAGE: "rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667"
+  SHELLCHECK_IMAGE: "koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo:ro" --workdir /repo "$ACTIONLINT_IMAGE" -color
+
+      - name: ShellCheck
+        run: docker run --rm -v "$PWD:/mnt:ro" "$SHELLCHECK_IMAGE" scripts/*.sh
