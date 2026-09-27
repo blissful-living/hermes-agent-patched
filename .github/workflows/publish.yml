@@ -432,24 +432,11 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: echo "$DOCKERHUB_TOKEN" | docker login docker.io -u "$DOCKERHUB_NAMESPACE" --password-stdin
 
-      # The mirror's `latest` moves last, so one that already points at the
-      # recorded digest means that image is fully mirrored.
       - name: Mirror the recorded images to Docker Hub
         if: steps.state.outcome == 'success'
         run: |
           set -euo pipefail
-          for name in hermes-agent-patched signal-cli-distroless; do
-            [ -f "state/$name/image" ] || continue
-            image=$(cat "state/$name/image")
-            dest="docker.io/$DOCKERHUB_NAMESPACE/$name"
-            if [ "$(scripts/image-digest.sh "$dest:latest" 2>/dev/null || true)" = "${image#*@}" ]; then
-              echo "Already mirrored: \`$image\`" >> "$GITHUB_STEP_SUMMARY"
-              continue
-            fi
-            gunzip -c "state/$name/sbom.spdx.json.gz" > "$name.spdx.json"
-            mirrored=$(scripts/mirror-image.sh "$image" "$dest" "$name.spdx.json")
-            echo "Mirrored \`$mirrored\`" >> "$GITHUB_STEP_SUMMARY"
-          done
+          scripts/mirror-recorded.sh state "$DOCKERHUB_NAMESPACE" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Log out of Docker Hub
         if: always()
