@@ -26,11 +26,9 @@
 name: publish
 
 on:
+  # Every pull request runs, so this check can be required on main: a check
+  # skipped by a path filter stays pending and blocks the merge.
   pull_request:
-    paths:
-      - "images/**"
-      - "scripts/**"
-      - ".github/workflows/publish.yml"
   push:
     branches: [main]
     paths:
