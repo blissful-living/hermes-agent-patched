@@ -1,6 +1,6 @@
 # hermes-agent-patched
 
-Security-patched container images of [Hermes Agent](https://github.com/NousResearch/hermes-agent) and [signal-cli](https://github.com/AsamK/signal-cli), published to GitHub Container Registry.
+Security-patched container images of [Hermes Agent](https://github.com/NousResearch/hermes-agent) and [signal-cli](https://github.com/AsamK/signal-cli), published to GitHub Container Registry and mirrored to Docker Hub.
 
 Each image is the official upstream release, kept current with Debian's updates, and published with the evidence to check it:
 
@@ -13,8 +13,8 @@ Every image is also signed with cosign and has a GitHub build provenance attesta
 
 | Image | Contents |
 | --- | --- |
-| `ghcr.io/blissful-living/hermes-agent-patched` | The official Hermes Agent image (`nousresearch/hermes-agent`) with Debian's pending updates applied by `apt-get upgrade`. |
-| `ghcr.io/blissful-living/signal-cli-distroless` | signal-cli's official native (GraalVM) binary (`ghcr.io/asamk/signal-cli:<version>-native`) on Google's distroless Debian 13 base (`gcr.io/distroless/cc-debian13:nonroot`). |
+| `ghcr.io/blissful-living/hermes-agent-patched`<br>`docker.io/blissfulliving/hermes-agent-patched` | The official Hermes Agent image (`nousresearch/hermes-agent`) with Debian's pending updates applied by `apt-get upgrade`. |
+| `ghcr.io/blissful-living/signal-cli-distroless`<br>`docker.io/blissfulliving/signal-cli-distroless` | signal-cli's official native (GraalVM) binary (`ghcr.io/asamk/signal-cli:<version>-native`) on Google's distroless Debian 13 base (`gcr.io/distroless/cc-debian13:nonroot`). |
 
 These images are unofficial. They are not affiliated with, or endorsed by, Nous Research or the signal-cli project.
 
@@ -32,6 +32,7 @@ These images are unofficial. They are not affiliated with, or endorsed by, Nous 
 - If so, both images are rebuilt from scratch and tested. An image whose inputs (Containerfile and Debian package database, or Containerfile and distroless digest) match the published one is not published again.
 - Each build produces an SPDX SBOM and a Trivy report of HIGH and CRITICAL vulnerabilities that have a fix.
 - Each published image is signed with cosign (keyless, with the workflow's GitHub OIDC identity), carries its SBOM as a cosign attestation, and has a GitHub build provenance attestation.
+- Each published image is then copied to Docker Hub byte for byte, so both registries serve the same digest, and signed there with its SBOM attached. A mirror that fails is completed by the next run.
 - Upstream images are pinned by digest; [Pinning and trust](#pinning-and-trust) describes how updates to them are merged.
 - The workflows ([publish](.github/workflows/publish.yml), [upstream report](.github/workflows/upstream-report.yml)) call the scripts in [scripts/](scripts), each documented in its header and runnable locally with Docker.
 - What a rebuild cannot fix is reported as issues in this repository, so it stays visible until an upstream release fixes it: vulnerabilities in software that Hermes or signal-cli bundles, and a bundled Chromium older than Chrome stable. The workflow updates each issue daily and closes it once the finding is gone.
@@ -69,6 +70,8 @@ docker pull ghcr.io/blissful-living/hermes-agent-patched:v2026.9.24-p20260927
 docker pull ghcr.io/blissful-living/signal-cli-distroless:0.14.8-p20260927
 ```
 
+The same tags, with the same digests, are on Docker Hub, for example `docker pull blissfulliving/hermes-agent-patched:v2026.9.24-p20260927`.
+
 A second build on the same day gets a counter (for example `-p20260927.2`). For reproducible deployments, pin a digest (`image@sha256:...`).
 
 The Hermes image replaces `nousresearch/hermes-agent` directly; see the [Hermes documentation](https://github.com/NousResearch/hermes-agent) for how to run it.
@@ -104,7 +107,7 @@ gh attestation verify oci://ghcr.io/blissful-living/hermes-agent-patched:latest 
   --source-ref refs/heads/main
 ```
 
-The same commands apply to `ghcr.io/blissful-living/signal-cli-distroless`.
+The same commands apply to `ghcr.io/blissful-living/signal-cli-distroless` and to both images on Docker Hub (`docker.io/blissfulliving/...`): the signatures and SBOM attestations are in both registries, and GitHub finds the build provenance by digest.
 
 ## Limitations
 

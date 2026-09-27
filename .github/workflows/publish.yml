@@ -17,11 +17,17 @@
 #     cosign attestation and adds a GitHub build provenance attestation.
 #   record   (after a publish)
 #     Records the published images on the `state` branch.
+#   mirror   (main only, after the record or in its place)
+#     Makes Docker Hub match the record: each recorded image is copied to
+#     Docker Hub byte for byte, keeping its digest, and signed there with its
+#     SBOM attached. An image already mirrored is left alone, so a failed
+#     mirror is completed by the next run.
 #
 # Pull requests stop after the build: nothing is pushed, signed or recorded.
-# The only credential is the workflow's own GITHUB_TOKEN. The steps call the
-# documented scripts in scripts/, which also run locally; upstream-report.yml
-# reports what a rebuild cannot fix.
+# The only credentials are the workflow's own GITHUB_TOKEN and a Docker Hub
+# access token, which only the mirror job receives, through the `dockerhub`
+# environment. The steps call the documented scripts in scripts/, which also
+# run locally; upstream-report.yml reports what a rebuild cannot fix.
 
 name: publish
 
@@ -51,6 +57,7 @@ env:
   HERMES_REPO: ghcr.io/blissful-living/hermes-agent-patched
   SIGNAL_REPO: ghcr.io/blissful-living/signal-cli-distroless
   SIGNAL_BASE: gcr.io/distroless/cc-debian13:nonroot
+  DOCKERHUB_NAMESPACE: blissfulliving
 
 jobs:
   check:
@@ -390,3 +397,60 @@ jobs:
         run: |
           scripts/record-state.sh new-state \
             "hermes-agent-patched=$HERMES_IMAGE" "signal-cli-distroless=$SIGNAL_IMAGE"
+
+  mirror:
+    needs: record
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: dockerhub
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # Only the scripts, from the commit that was built.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+
+      - name: Check out the record of the published images
+        id: state
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: state
+          path: state
+          persist-credentials: false
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        if: steps.state.outcome == 'success'
+
+      - name: Log in to Docker Hub
+        if: steps.state.outcome == 'success'
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: echo "$DOCKERHUB_TOKEN" | docker login docker.io -u "$DOCKERHUB_NAMESPACE" --password-stdin
+
+      # The mirror's `latest` moves last, so one that already points at the
+      # recorded digest means that image is fully mirrored.
+      - name: Mirror the recorded images to Docker Hub
+        if: steps.state.outcome == 'success'
+        run: |
+          set -euo pipefail
+          for name in hermes-agent-patched signal-cli-distroless; do
+            [ -f "state/$name/image" ] || continue
+            image=$(cat "state/$name/image")
+            dest="docker.io/$DOCKERHUB_NAMESPACE/$name"
+            if [ "$(scripts/image-digest.sh "$dest:latest" 2>/dev/null || true)" = "${image#*@}" ]; then
+              echo "Already mirrored: \`$image\`" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            gunzip -c "state/$name/sbom.spdx.json.gz" > "$name.spdx.json"
+            mirrored=$(scripts/mirror-image.sh "$image" "$dest" "$name.spdx.json")
+            echo "Mirrored \`$mirrored\`" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Log out of Docker Hub
+        if: always()
+        run: docker logout docker.io
