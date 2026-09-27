@@ -33,7 +33,7 @@ These images are unofficial. They are not affiliated with, or endorsed by, Nous 
 - Each build produces an SPDX SBOM and a Trivy report of HIGH and CRITICAL vulnerabilities that have a fix.
 - Each published image is signed with cosign (keyless, with the workflow's GitHub OIDC identity), carries its SBOM as a cosign attestation, and has a GitHub build provenance attestation.
 - Each published image is then copied to Docker Hub byte for byte, so both registries serve the same digest, and signed there with its SBOM attached. A mirror that fails is completed by the next run.
-- Upstream images are pinned by digest; [Pinning and trust](#pinning-and-trust) describes how updates to them are merged.
+- Upstream images are pinned by digest and updated automatically; [Automatic updates](#automatic-updates) describes when.
 - The workflows ([publish](.github/workflows/publish.yml), [upstream report](.github/workflows/upstream-report.yml)) call the scripts in [scripts/](scripts), each documented in its header and runnable locally with Docker.
 - What a rebuild cannot fix is reported as issues in this repository, so it stays visible until an upstream release fixes it: vulnerabilities in software that Hermes or signal-cli bundles, and a bundled Chromium older than Chrome stable. The workflow updates each issue daily and closes it once the finding is gone.
 
@@ -49,8 +49,22 @@ These images follow the same principle:
 
 - Every Hermes pin stays as it is. Chromium, Node.js, Python, and the Python and JavaScript dependencies change only with a new Hermes release.
 - The only updates applied are Debian 13's own: its security updates and the fixes in its point releases. They come through a separate chain of trust. Debian's security team and stable release managers review each update and keep it to fixes for the versions already in the release, and apt checks every package against the archive's signed metadata.
-- Upstream images, build tools and GitHub Actions are pinned by digest or commit SHA. Renovate merges an update on its own only once it is at least seven days old, and Hermes and signal-cli releases wait for approval.
+- Upstream images, build tools and GitHub Actions are pinned by digest or commit SHA, and move forward on their own after a waiting period (see [Automatic updates](#automatic-updates)).
 - Each published tag is built once and never rewritten; only `latest` moves.
+
+## Automatic updates
+
+Everything in these images updates without anyone having to act. Each update waits a set time after its release, then passes the same build, tests and linting as any other change before it is published:
+
+| What | Reaches the images | Wait after release | Why |
+| --- | --- | --- | --- |
+| Debian security and point-release updates | At the next daily check (14:07 UTC) | None | Debian's security team and signed archive already review each update. |
+| A new Hermes Agent release | Within about a day | 1 day | Hermes quarantines its own dependencies for 14 days; the day covers a compromised Hermes release, which is usually caught within hours. |
+| A new signal-cli release | Within hours | None | Signal retires old clients, and GitHub Container Registry gives [Renovate](https://docs.renovatebot.com) no release dates to wait on. |
+| A new distroless base for signal-cli | At the next daily check | None | Google rebuilds it as Debian ships fixes. |
+| Build tools (Trivy, actionlint, ShellCheck, the Debian image for the daily check) and GitHub Actions | Within about a week | 7 days | They never end up in the published images, so there is no hurry. |
+
+Debian updates and the distroless base are picked up by the daily workflow. Renovate proposes every other update as a pull request, which merges itself once its wait is over and the `build` and `lint` checks pass; the merge then publishes new images. A failed build stops the update and leaves the published images as they are, so a broken upstream release never reaches them.
 
 ## What is not patched
 

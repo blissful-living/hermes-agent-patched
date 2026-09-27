@@ -5,6 +5,9 @@
     "docker:pinDigests",
     "helpers:pinGitHubActionDigests"
   ],
+  "description": "Every update is a pull request that merges itself once its release is old enough and the build and lint checks pass. main accepts only squash merges of signed commits, so Renovate commits through GitHub's API, which signs them.",
+  "automergeStrategy": "squash",
+  "platformCommit": "enabled",
   "customManagers": [
     {
       "description": "Images pinned by tag and digest, as quoted strings, in the workflows and scripts.",
@@ -21,20 +24,21 @@
   ],
   "packageRules": [
     {
-      "description": "Hermes releases are tagged vYYYY.M.D (sometimes with a fourth part); each one waits for approval.",
+      "description": "Hermes releases are tagged vYYYY.M.D (sometimes with a fourth part). A new release merges itself one day after it is published: Hermes quarantines its own dependencies, and the day covers a compromised release, which is usually caught within hours.",
       "matchPackageNames": [
         "nousresearch/hermes-agent"
       ],
       "versioning": "regex:^v(?<major>\\d{4})\\.(?<minor>\\d+)\\.(?<patch>\\d+)(\\.(?<build>\\d+))?$",
-      "automerge": false
+      "minimumReleaseAge": "1 day",
+      "automerge": true
     },
     {
-      "description": "signal-cli must stay current because Signal retires old clients. GHCR gives Renovate no release dates, so a minimum release age cannot hold new releases back; each one waits for approval instead.",
+      "description": "signal-cli must stay current because Signal retires old clients. GHCR gives Renovate no release dates, so a new release merges itself without a wait.",
       "matchPackageNames": [
         "ghcr.io/asamk/signal-cli"
       ],
       "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-native$",
-      "automerge": false
+      "automerge": true
     },
     {
       "description": "The distroless base is resolved to its current digest at each build, so it is not pinned here.",
@@ -44,18 +48,15 @@
       "enabled": false
     },
     {
-      "description": "New digests of the Debian image used by the daily check, merged once the tag has gone seven days without a new push. Docker Hub's push date is the release date, so a re-push restarts the wait.",
-      "matchPackageNames": [
-        "debian"
-      ],
-      "matchUpdateTypes": [
-        "digest"
+      "description": "Tools the workflows and scripts run (Trivy, actionlint, ShellCheck and the Debian image for the daily check) do not end up in the published images, so they merge themselves once a release is at least seven days old. Docker Hub's push date counts as the release date, so a re-pushed tag restarts the wait.",
+      "matchManagers": [
+        "custom.regex"
       ],
       "minimumReleaseAge": "7 days",
       "automerge": true
     },
     {
-      "description": "Pinned GitHub Actions, merged once a release is at least seven days old.",
+      "description": "Pinned GitHub Actions merge themselves once a release is at least seven days old.",
       "matchManagers": [
         "github-actions"
       ],
