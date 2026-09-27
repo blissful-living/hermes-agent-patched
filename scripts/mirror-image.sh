@@ -26,10 +26,10 @@ tag=${ref##*:}
 digest=${image#*@}
 source="${ref%:*}@$digest"
 
-# With a single source, imagetools copies the manifest as it is, which keeps
-# the digest; the check makes sure of it.
+# --prefer-index=false copies the single manifest as it is instead of wrapping
+# it in a new index, which keeps the digest; the check makes sure of it.
 copy() {
-  docker buildx imagetools create --tag "$1" "$source" >&2
+  docker buildx imagetools create --prefer-index=false --tag "$1" "$source" >&2
   copied=$("$here/image-digest.sh" "$1")
   if [ "$copied" != "$digest" ]; then
     echo "$1 is $copied, expected $digest" >&2
