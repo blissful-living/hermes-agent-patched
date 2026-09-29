@@ -1,6 +1,6 @@
 # Third-party notices
 
-The images published from this repository redistribute the following software. Apart from the Debian package upgrade in the Hermes image, each is redistributed unmodified; this repository's MIT licence does not apply to it.
+The images published from this repository redistribute the following software. Apart from the Debian package upgrades in the Hermes and SSH sandbox images, and the SSH server configuration and entrypoint in the sandbox, each is redistributed unmodified; this repository's MIT licence does not apply to it.
 
 ## Hermes Agent
 
@@ -25,3 +25,10 @@ The binary includes the Java libraries signal-cli depends on, each under its own
 - The Hermes image is based on Debian 13; the signal-cli image is based on [distroless](https://github.com/GoogleContainerTools/distroless) `cc-debian13`, which is built from Debian packages. Distroless is licensed under the [Apache License 2.0](https://github.com/GoogleContainerTools/distroless/blob/main/LICENSE).
 - Each Debian package is under its own licence, recorded in the image at `/usr/share/doc/<package>/copyright`.
 - The exact package versions are listed in each image's SBOM. Their source is available from Debian at [sources.debian.org](https://sources.debian.org) and, for any past version, [snapshot.debian.org](https://snapshot.debian.org).
+
+## Debian packages in the SSH sandbox
+
+- Image: `ghcr.io/blissful-living/hermes-ssh-sandbox`
+- Upstream: [Debian 13](https://www.debian.org/releases/trixie/), distributed as `debian:13-slim`, with the packages `openssh-server`, `bash`, `python3`, `git`, `curl`, `ripgrep`, `procps` and `ca-certificates` and their dependencies installed from Debian's archive
+- Licences: each package's own, recorded in the image under `/usr/share/doc/<package>/copyright` and in the image's SBOM
+- Source: every package's source is in Debian's archive; `apt-get source <package>` or [sources.debian.org](https://sources.debian.org) gives the exact version the image's package database names

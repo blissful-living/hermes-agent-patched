@@ -17,7 +17,7 @@ here=$(dirname "$0")
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-for name in hermes-agent-patched signal-cli-distroless; do
+for name in hermes-agent-patched signal-cli-distroless hermes-ssh-sandbox; do
   [ -f "$state/$name/sbom.spdx.json.gz" ] || continue
   gunzip -c "$state/$name/sbom.spdx.json.gz" > "$work/$name.spdx.json"
   "$here/scan-sbom.sh" "$work/$name.spdx.json" > "$work/$name.trivy.json"

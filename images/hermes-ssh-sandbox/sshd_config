@@ -1,0 +1,37 @@
+# SSH server for Hermes Agent's ssh terminal backend. One user, public keys
+# only, and nothing beyond running commands and transferring files: no
+# forwarding of ports, agents, sockets or X11, no tunnels, and no environment
+# from the client, so a gateway's secrets cannot travel here even when the
+# gateway names them for passthrough.
+
+Port 2222
+ListenAddress 0.0.0.0
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+AllowUsers agent
+PermitRootLogin no
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+UsePAM no
+# Root-owned and outside the agent's home, so the agent cannot add keys.
+AuthorizedKeysFile /etc/ssh/authorized_keys/%u
+StrictModes yes
+MaxAuthTries 3
+LoginGraceTime 20
+
+AllowTcpForwarding no
+AllowAgentForwarding no
+AllowStreamLocalForwarding no
+X11Forwarding no
+PermitTunnel no
+GatewayPorts no
+PermitUserEnvironment no
+PermitUserRC no
+
+# Hermes keeps one multiplexed connection open for up to five minutes.
+ClientAliveInterval 60
+ClientAliveCountMax 3
+
+PrintMotd no
+Subsystem sftp internal-sftp
