@@ -1,0 +1,47 @@
+# A sandbox for Hermes Agent's ssh terminal backend: Debian 13 with an SSH
+# server and the tools Hermes' terminal, file and code-execution tools use.
+# Hermes runs its gateway elsewhere and sends the agent's commands here, so
+# the agent's shell holds none of the gateway's secrets, configuration or
+# state.
+#
+# Debian's pending updates are applied at every build, as in the Hermes
+# image. The Debian image is pinned by digest; Renovate proposes new builds.
+FROM debian:13-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
+
+LABEL org.opencontainers.image.title="hermes-ssh-sandbox" \
+      org.opencontainers.image.description="Unofficial SSH sandbox for Hermes Agent's ssh terminal backend, on Debian 13. Not affiliated with Nous Research." \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="Blissful Living Foundation" \
+      org.opencontainers.image.url="https://github.com/blissful-living/hermes-agent-patched" \
+      org.opencontainers.image.source="https://github.com/blissful-living/hermes-agent-patched"
+
+# Hermes' file tools run as shell commands and search with ripgrep when it is
+# present; its code execution needs Python 3; uploads use scp over SFTP and
+# synchronisation uses tar. The host keys the openssh-server package
+# generates are removed, so no image carries a private key: the entrypoint
+# installs the supplied one at start.
+RUN apt-get -o Acquire::Retries=3 update \
+ && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -y --with-new-pkgs upgrade \
+ && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -y install --no-install-recommends \
+      bash ca-certificates curl git openssh-server procps python3 ripgrep \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* /etc/ssh/ssh_host_*
+
+# The agent's account: no password (`*` rather than a locked `!`, which sshd
+# would refuse even for key logins) and no sudo. /etc/sandbox receives the
+# host key and authorized keys and is closed to the agent.
+RUN useradd --create-home --home-dir /home/agent --shell /bin/bash --uid 1000 --user-group agent \
+ && usermod -p '*' agent \
+ && install -d -m 0700 /etc/sandbox \
+ && install -d -m 0755 /etc/ssh/authorized_keys /run/sshd
+
+COPY sshd_config /etc/ssh/sshd_config
+COPY --chmod=0755 entrypoint.sh /usr/local/sbin/sandbox-entrypoint
+
+# Fails the build if the configuration does not parse.
+RUN ssh-keygen -q -t ed25519 -N '' -f /tmp/test-host-key \
+ && /usr/sbin/sshd -t -f /etc/ssh/sshd_config -h /tmp/test-host-key \
+ && rm -f /tmp/test-host-key /tmp/test-host-key.pub
+
+EXPOSE 2222
+ENTRYPOINT ["/usr/local/sbin/sandbox-entrypoint"]

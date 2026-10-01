@@ -1,6 +1,6 @@
 # hermes-agent-patched
 
-Security-patched container images of [Hermes Agent](https://github.com/NousResearch/hermes-agent) and [signal-cli](https://github.com/AsamK/signal-cli), published to GitHub Container Registry and mirrored to Docker Hub.
+Security-patched container images of [Hermes Agent](https://github.com/NousResearch/hermes-agent) and [signal-cli](https://github.com/AsamK/signal-cli), and an SSH sandbox for Hermes' `ssh` terminal backend, published to GitHub Container Registry and mirrored to Docker Hub.
 
 Each image is the official upstream release, kept current with Debian's updates, and published with the evidence to check it:
 
@@ -15,6 +15,7 @@ Every image is also signed with cosign and has a GitHub build provenance attesta
 | --- | --- |
 | `ghcr.io/blissful-living/hermes-agent-patched`<br>`docker.io/blissfulliving/hermes-agent-patched` | The official Hermes Agent image (`nousresearch/hermes-agent`) with Debian's pending updates applied by `apt-get upgrade`. |
 | `ghcr.io/blissful-living/signal-cli-distroless`<br>`docker.io/blissfulliving/signal-cli-distroless` | signal-cli's official native (GraalVM) binary (`ghcr.io/asamk/signal-cli:<version>-native`) on Google's distroless Debian 13 base (`gcr.io/distroless/cc-debian13:nonroot`). |
+| `ghcr.io/blissful-living/hermes-ssh-sandbox`<br>`docker.io/blissfulliving/hermes-ssh-sandbox` | A sandbox for Hermes Agent's `ssh` terminal backend: Debian 13 (`debian:13-slim`) with Debian's pending updates applied, an SSH server for one unprivileged user, and the tools Hermes' terminal, file and code-execution tools use. The gateway runs elsewhere, so the agent's shell never holds its secrets, configuration or state. |
 
 These images are unofficial. They are not affiliated with, or endorsed by, Nous Research or the signal-cli project.
 
@@ -28,8 +29,8 @@ These images are unofficial. They are not affiliated with, or endorsed by, Nous 
 
 ## How
 
-- Every day a workflow checks, without pulling the published images, whether a rebuild would change anything: any pending Debian update for the packages in the Hermes image, or a new build of the distroless base for signal-cli.
-- If so, both images are rebuilt from scratch and tested. An image whose inputs (Containerfile and Debian package database, or Containerfile and distroless digest) match the published one is not published again.
+- Every day a workflow checks, without pulling the published images, whether a rebuild would change anything: any pending Debian update for the packages in the Hermes image or the SSH sandbox, or a new build of the distroless base for signal-cli.
+- If so, all three images are rebuilt from scratch and tested. An image whose inputs (Containerfile and Debian package database, Containerfile and distroless digest, or the sandbox's Containerfile, SSH configuration, entrypoint and Debian package database) match the published one is not published again.
 - Each build produces an SPDX SBOM and a Trivy report of HIGH and CRITICAL vulnerabilities that have a fix.
 - Each published image is signed with cosign (keyless, with the workflow's GitHub OIDC identity), carries its SBOM as a cosign attestation, and has a GitHub build provenance attestation.
 - Each published image is then copied to Docker Hub byte for byte, so both registries serve the same digest, and signed there with its SBOM attached. A mirror that fails is completed by the next run.
@@ -62,6 +63,7 @@ Everything in these images updates without anyone having to act. Each update wai
 | A new Hermes Agent release | Within about a day | 1 day | Hermes quarantines its own dependencies for 14 days; the day covers a compromised Hermes release, which is usually caught within hours. |
 | A new signal-cli release | Within hours | None | Signal retires old clients, and GitHub Container Registry gives [Renovate](https://docs.renovatebot.com) no release dates to wait on. |
 | A new distroless base for signal-cli | At the next daily check | None | Google rebuilds it as Debian ships fixes. |
+| A new `debian:13-slim` build for the SSH sandbox | Within about a week | 7 days | Debian's updates already reach the sandbox daily through `apt-get upgrade`; a new base only moves its starting point. |
 | Build tools (Trivy, actionlint, ShellCheck, the Debian image for the daily check) and GitHub Actions | Within about a week | 7 days | They never end up in the published images, so there is no hurry. |
 
 Debian updates and the distroless base are picked up by the daily workflow. Renovate proposes every other update as a pull request, which merges itself once its wait is over and the `build` and `lint` checks pass; the merge then publishes new images. A failed build stops the update and leaves the published images as they are, so a broken upstream release never reaches them.
@@ -82,6 +84,7 @@ Tags are `<upstream version>-p<build date>`, plus `latest`:
 ```sh
 docker pull ghcr.io/blissful-living/hermes-agent-patched:v2026.9.24-p20260927
 docker pull ghcr.io/blissful-living/signal-cli-distroless:0.14.8-p20260927
+docker pull ghcr.io/blissful-living/hermes-ssh-sandbox:latest
 ```
 
 The same tags, with the same digests, are on Docker Hub, for example `docker pull blissfulliving/hermes-agent-patched:v2026.9.24-p20260927`.
@@ -95,6 +98,21 @@ The signal-cli image runs as the distroless `nonroot` user (UID 65532) with the 
 ```sh
 docker run --rm -it -v signal-cli:/var/lib/signal-cli ghcr.io/blissful-living/signal-cli-distroless:latest link -n my-device
 ```
+
+The SSH sandbox runs `sshd` on port 2222 for one user, `agent` (UID 1000, home `/home/agent`, no `sudo`), with public-key logins only and no forwarding, tunnels or client environment. At start it takes its host key and the agent's authorized keys from `/etc/sandbox`:
+
+- `/etc/sandbox/host_ed25519_key`: the server's private host key. Without it a key is generated for that start only, so a client that pins the host key refuses the server after every restart.
+- `/etc/sandbox/authorized_keys`: the public keys that may log in as `agent`. Required.
+
+Both are copied into place owned by root, as `sshd` requires. Supply them owned by root, as secrets a platform writes at start or with `docker cp` before the first start; a bind mount keeps the host user's ownership, which can leave the source readable to the agent. A volume mounted at `/home/agent` keeps the agent's files across restarts.
+
+```sh
+docker create --name sandbox -p 2222:2222 ghcr.io/blissful-living/hermes-ssh-sandbox:latest
+docker cp ./sandbox/. sandbox:/etc/sandbox/
+docker start sandbox
+```
+
+Point Hermes at it with `terminal.backend: ssh` and `terminal.ssh_host`, `terminal.ssh_user` (`agent`), `terminal.ssh_port` and `terminal.ssh_key`, and put the server's public host key in the gateway's `known_hosts`, since Hermes otherwise trusts the first key it sees. Hermes keeps dangerous-command approval and tirith on the gateway for the `ssh` backend.
 
 ### Verifying
 
@@ -121,7 +139,7 @@ gh attestation verify oci://ghcr.io/blissful-living/hermes-agent-patched:latest 
   --source-ref refs/heads/main
 ```
 
-The same commands apply to `ghcr.io/blissful-living/signal-cli-distroless` and to both images on Docker Hub (`docker.io/blissfulliving/...`): the signatures and SBOM attestations are in both registries, and GitHub finds the build provenance by digest.
+The same commands apply to `ghcr.io/blissful-living/signal-cli-distroless`, to `ghcr.io/blissful-living/hermes-ssh-sandbox` and to all three images on Docker Hub (`docker.io/blissfulliving/...`): the signatures and SBOM attestations are in both registries, and GitHub finds the build provenance by digest.
 
 ## Limitations
 
@@ -129,9 +147,10 @@ The same commands apply to `ghcr.io/blissful-living/signal-cli-distroless` and t
 - The signal-cli image has no shell or package manager. signal-cli extracts its libsignal library to `/tmp` when it starts, so `/tmp` must be writable (for example a tmpfs when the root file system is read-only).
 - The images differ slightly from upstream: newer Debian packages in the Hermes image; a different base, user (65532 rather than `signal-cli`) and no shell tools in the signal-cli image.
 - A Debian fix reaches the images at the first daily check after Debian (or, for the distroless base, Google) publishes it.
+- The SSH sandbox limits what arrives over SSH, not what leaves: its outbound network is whatever the platform running it allows. Restrict it there.
 
 ## Licences
 
-This repository's own files are under the [MIT licence](LICENSE). The images contain third-party software under its own licences: Hermes Agent (MIT), signal-cli (GPL-3.0), and Debian and distroless packages (various). [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists them and links to the corresponding signal-cli source.
+This repository's own files are under the [MIT licence](LICENSE). The images contain third-party software under its own licences: Hermes Agent (MIT), signal-cli (GPL-3.0), and Debian and distroless packages (various), including those in the SSH sandbox. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists them and links to the corresponding signal-cli source.
 
 The images and this repository are provided as is, without warranty of any kind. To report a problem, see [SECURITY.md](SECURITY.md).

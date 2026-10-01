@@ -3,6 +3,7 @@
 # of its Containerfile that names an image rather than a build argument.
 #   hermes-agent-patched   nousresearch/hermes-agent:<version>@sha256:<digest>
 #   signal-cli-distroless  ghcr.io/asamk/signal-cli:<version>-native@sha256:<digest>
+#   hermes-ssh-sandbox     debian:13-slim@sha256:<digest>
 #
 # Usage: upstream-image.sh <image name>
 set -euo pipefail

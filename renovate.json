@@ -48,6 +48,17 @@
       "enabled": false
     },
     {
+      "description": "The SSH sandbox's Debian image. Debian's updates already reach the sandbox daily through apt-get upgrade, so a new debian:13-slim build merges itself once it is at least seven days old.",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchPackageNames": [
+        "debian"
+      ],
+      "minimumReleaseAge": "7 days",
+      "automerge": true
+    },
+    {
       "description": "Tools the workflows and scripts run (Trivy, actionlint, ShellCheck and the Debian image for the daily check) do not end up in the published images, so they merge themselves once a release is at least seven days old. Docker Hub's push date counts as the release date, so a re-pushed tag restarts the wait.",
       "matchManagers": [
         "custom.regex"

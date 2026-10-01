@@ -20,7 +20,7 @@ revision=${GITHUB_SHA:-$(git -C "$here" rev-parse HEAD)}
 build_args=()
 
 case $name in
-  hermes-agent-patched)
+  hermes-agent-patched | hermes-ssh-sandbox)
     from=$("$here/upstream-image.sh" "$name")
     base_name="docker.io/${from%@*}"
     base_digest=${from#*@}

@@ -18,7 +18,7 @@ here=$(dirname "$0")
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-for name in hermes-agent-patched signal-cli-distroless; do
+for name in hermes-agent-patched signal-cli-distroless hermes-ssh-sandbox; do
   [ -f "$state/$name/image" ] || continue
   image=$(cat "$state/$name/image")
   dest="docker.io/$namespace/$name"
