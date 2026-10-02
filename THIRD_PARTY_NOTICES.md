@@ -11,6 +11,13 @@ The images published from this repository redistribute the following software. A
 
 The upstream image also contains software that Hermes bundles (among others Node.js, Chromium, SQLite, and Python and JavaScript packages), each under its own licence.
 
+## tirith
+
+- Image: `ghcr.io/blissful-living/hermes-agent-patched`, at `/usr/local/bin/tirith`
+- Upstream: [sheeki03/tirith](https://github.com/sheeki03/tirith), the release archive `tirith-x86_64-unknown-linux-gnu.tar.gz`
+- Licence: [GNU Affero General Public License v3.0](https://github.com/sheeki03/tirith/blob/main/LICENSE-AGPL) (tirith is also offered under a commercial licence, which does not apply here)
+- Source: `tirith --version` in the image names the release; its complete corresponding source is at `https://github.com/sheeki03/tirith/tree/v<version>`. The release the image is built from is the `TIRITH_VERSION` argument in [images/hermes-agent-patched/Containerfile](images/hermes-agent-patched/Containerfile).
+
 ## signal-cli
 
 - Image: `ghcr.io/blissful-living/signal-cli-distroless`

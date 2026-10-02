@@ -13,7 +13,7 @@ Every image is also signed with cosign and has a GitHub build provenance attesta
 
 | Image | Contents |
 | --- | --- |
-| `ghcr.io/blissful-living/hermes-agent-patched`<br>`docker.io/blissfulliving/hermes-agent-patched` | The official Hermes Agent image (`nousresearch/hermes-agent`) with Debian's pending updates applied by `apt-get upgrade`. |
+| `ghcr.io/blissful-living/hermes-agent-patched`<br>`docker.io/blissfulliving/hermes-agent-patched` | The official Hermes Agent image (`nousresearch/hermes-agent`) with Debian's pending updates applied by `apt-get upgrade`, and the [tirith](https://github.com/sheeki03/tirith) command scanner that Hermes' dangerous-command checks run. |
 | `ghcr.io/blissful-living/signal-cli-distroless`<br>`docker.io/blissfulliving/signal-cli-distroless` | signal-cli's official native (GraalVM) binary (`ghcr.io/asamk/signal-cli:<version>-native`) on Google's distroless Debian 13 base (`gcr.io/distroless/cc-debian13:nonroot`). |
 | `ghcr.io/blissful-living/hermes-ssh-sandbox`<br>`docker.io/blissfulliving/hermes-ssh-sandbox` | A sandbox for Hermes Agent's `ssh` terminal backend: Debian 13 (`debian:13-slim`) with Debian's pending updates applied, an SSH server for one unprivileged user, and the tools Hermes' terminal, file and code-execution tools use. The gateway runs elsewhere, so the agent's shell never holds its secrets, configuration or state. |
 
@@ -49,9 +49,10 @@ In both compromises, attackers published malicious versions through the projects
 These images follow the same principle:
 
 - Every Hermes pin stays as it is. Chromium, Node.js, Python, and the Python and JavaScript dependencies change only with a new Hermes release.
-- The only updates applied are Debian 13's own: its security updates and the fixes in its point releases. They come through a separate chain of trust. Debian's security team and stable release managers review each update and keep it to fixes for the versions already in the release, and apt checks every package against the archive's signed metadata.
+- Apart from tirith (below), the only updates applied are Debian 13's own: its security updates and the fixes in its point releases. They come through a separate chain of trust. Debian's security team and stable release managers review each update and keep it to fixes for the versions already in the release, and apt checks every package against the archive's signed metadata.
 - Upstream images, build tools and GitHub Actions are pinned by digest or commit SHA, and move forward on their own after a waiting period (see [Automatic updates](#automatic-updates)).
 - Each published tag is built once and never rewritten; only `latest` moves.
+- The Hermes image adds one program: tirith, the command scanner Hermes runs on every command the agent sends to its terminal. Without it in the image, Hermes downloads whatever tirith release is latest onto its data volume at first start, checks it only against that release's own checksums (and its signature only when cosign is installed, which the image does not have), and never updates it. The image instead pins a release, and the build fails unless the release's checksums carry a valid keyless cosign signature from tirith's release workflow at that tag and the archive matches them. tirith refreshes its own signed threat database in Hermes' data directory, at most once a day.
 
 ## Automatic updates
 
@@ -63,8 +64,9 @@ Everything in these images updates without anyone having to act. Each update wai
 | A new Hermes Agent release | Within about a day | 1 day | Hermes quarantines its own dependencies for 14 days; the day covers a compromised Hermes release, which is usually caught within hours. |
 | A new signal-cli release | Within hours | None | Signal retires old clients, and GitHub Container Registry gives [Renovate](https://docs.renovatebot.com) no release dates to wait on. |
 | A new distroless base for signal-cli | At the next daily check | None | Google rebuilds it as Debian ships fixes. |
+| A new tirith release | Within about a week | 7 days | It inspects every command the agent runs; the week covers a compromised release published through tirith's own signing pipeline. |
 | A new `debian:13-slim` build for the SSH sandbox | Within about a week | 7 days | Debian's updates already reach the sandbox daily through `apt-get upgrade`; a new base only moves its starting point. |
-| Build tools (Trivy, actionlint, ShellCheck, the Debian image for the daily check) and GitHub Actions | Within about a week | 7 days | They never end up in the published images, so there is no hurry. |
+| Build tools (Trivy, actionlint, ShellCheck, the Debian image for the daily check, cosign and the Debian image that verify tirith during the build) and GitHub Actions | Within about a week | 7 days | They never end up in the published images, so there is no hurry. |
 
 Debian updates and the distroless base are picked up by the daily workflow. Renovate proposes every other update as a pull request, which merges itself once its wait is over and the `build` and `lint` checks pass; the merge then publishes new images. A failed build stops the update and leaves the published images as they are, so a broken upstream release never reaches them.
 
