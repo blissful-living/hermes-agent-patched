@@ -1,4 +1,5 @@
-# The official Hermes Agent release with Debian 13's pending updates applied.
+# The official Hermes Agent release with Debian 13's pending updates applied,
+# and the tirith command scanner that Hermes' dangerous-command checks run.
 # The release image never runs apt-get upgrade and its build reuses cached
 # layers, so its Debian packages can be months older than the release itself.
 # The upstream image is pinned by digest; Renovate proposes new releases.
@@ -6,10 +7,49 @@
 # Everything Hermes pins stays as it is: Node.js, Chromium, its own SQLite
 # library and its Python and JavaScript dependencies are installed outside
 # Debian's package manager and change only with a new Hermes release.
-FROM nousresearch/hermes-agent:v2026.9.24@sha256:fca358f12efd65bfaaca05884166f15c0e2788375ca30d77061ac1ebc96452b7
+#
+# The Hermes image comes first, because scripts/upstream-image.sh takes the
+# first FROM as the upstream release; the final stage builds on it by name.
+FROM nousresearch/hermes-agent:v2026.9.24@sha256:fca358f12efd65bfaaca05884166f15c0e2788375ca30d77061ac1ebc96452b7 AS hermes
+
+# tirith, fetched and verified in a stage of its own so that neither cosign
+# nor the downloads reach the published image. Without a tirith on PATH,
+# Hermes downloads whatever release is latest onto its data volume at first
+# start, checked only against that release's own checksums, and never updates
+# it. Here the version is pinned, and the build fails unless checksums.txt
+# carries a valid keyless signature from tirith's release workflow at that
+# exact tag and the archive matches its checksum. Renovate proposes new
+# releases.
+FROM debian:13-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS tirith
+COPY --from=ghcr.io/sigstore/cosign/cosign:v3.1.3@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8 /ko-app/cosign /usr/local/bin/cosign
+# renovate: datasource=github-releases depName=sheeki03/tirith
+ARG TIRITH_VERSION=0.4.2
+ARG TARGETARCH
+WORKDIR /tmp/tirith
+RUN apt-get -o Acquire::Retries=3 update \
+ && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -y install --no-install-recommends ca-certificates curl \
+ && case "$TARGETARCH" in \
+      amd64) archive=tirith-x86_64-unknown-linux-gnu.tar.gz ;; \
+      arm64) archive=tirith-aarch64-unknown-linux-gnu.tar.gz ;; \
+      *) echo "tirith has no Linux build for $TARGETARCH" >&2; exit 1 ;; \
+    esac \
+ && release="https://github.com/sheeki03/tirith/releases/download/v$TIRITH_VERSION" \
+ && for file in checksums.txt checksums.txt.sig checksums.txt.pem "$archive"; do \
+      curl -fsSL --retry 3 -o "$file" "$release/$file"; \
+    done \
+ && cosign verify-blob --certificate checksums.txt.pem --signature checksums.txt.sig \
+      --certificate-identity "https://github.com/sheeki03/tirith/.github/workflows/release.yml@refs/tags/v$TIRITH_VERSION" \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      checksums.txt \
+ && grep " $archive\$" checksums.txt | sha256sum -c - \
+ && tar -xzf "$archive" tirith \
+ && install -m 0755 tirith /usr/local/bin/tirith \
+ && /usr/local/bin/tirith --version
+
+FROM hermes
 
 LABEL org.opencontainers.image.title="hermes-agent-patched" \
-      org.opencontainers.image.description="Unofficial Hermes Agent image with Debian's pending updates applied. Not affiliated with Nous Research." \
+      org.opencontainers.image.description="Unofficial Hermes Agent image with Debian's pending updates applied and the tirith command scanner included. Not affiliated with Nous Research." \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.vendor="Blissful Living Foundation" \
       org.opencontainers.image.url="https://github.com/blissful-living/hermes-agent-patched" \
@@ -23,3 +63,8 @@ RUN apt-get -o Acquire::Retries=3 update \
  && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -y --with-new-pkgs upgrade \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
+
+# Root-owned and outside the data volume, so the gateway's user cannot replace
+# it. tirith keeps its signed threat database under the hermes user's home on
+# the volume and refreshes it itself, at most once a day.
+COPY --from=tirith /usr/local/bin/tirith /usr/local/bin/tirith

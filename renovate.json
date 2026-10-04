@@ -20,6 +20,17 @@
         "\"(?<depName>[a-z0-9./-]+):(?<currentValue>[A-Za-z0-9._-]+)@(?<currentDigest>sha256:[a-f0-9]{64})\""
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      "description": "Release versions pinned as build arguments in the Containerfiles, each named by the renovate comment above it.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^images/[^/]+/Containerfile$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)\\s+ARG [A-Z_]+_VERSION=(?<currentValue>\\S+)"
+      ],
+      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+\\.\\d+)$"
     }
   ],
   "packageRules": [
@@ -48,7 +59,7 @@
       "enabled": false
     },
     {
-      "description": "The SSH sandbox's Debian image. Debian's updates already reach the sandbox daily through apt-get upgrade, so a new debian:13-slim build merges itself once it is at least seven days old.",
+      "description": "Debian images: the SSH sandbox's base, and the stage that fetches tirith for the Hermes image. Debian's updates already reach the sandbox daily through apt-get upgrade, and the tirith stage keeps nothing from its base, so a new debian:13-slim build merges itself once it is at least seven days old.",
       "matchManagers": [
         "dockerfile"
       ],
@@ -62,6 +73,25 @@
       "description": "Tools the workflows and scripts run (Trivy, actionlint, ShellCheck and the Debian image for the daily check) do not end up in the published images, so they merge themselves once a release is at least seven days old. Docker Hub's push date counts as the release date, so a re-pushed tag restarts the wait.",
       "matchManagers": [
         "custom.regex"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "minimumReleaseAge": "7 days",
+      "automerge": true
+    },
+    {
+      "description": "tirith, the command scanner in the Hermes image, is pinned to a release whose signature the build verifies. A new release merges itself once it is at least seven days old, which covers a compromised release that its own signing pipeline published. Its threat database is not pinned: tirith refreshes it on the data volume.",
+      "matchPackageNames": [
+        "sheeki03/tirith"
+      ],
+      "minimumReleaseAge": "7 days",
+      "automerge": true
+    },
+    {
+      "description": "Cosign, which verifies tirith's signature while the Hermes image is built and does not end up in it, merges itself once a release is at least seven days old.",
+      "matchPackageNames": [
+        "ghcr.io/sigstore/cosign/cosign"
       ],
       "minimumReleaseAge": "7 days",
       "automerge": true
