@@ -242,7 +242,7 @@ jobs:
       # need only the packages, and the file listings would more than triple
       # the size of the SBOM attestation.
       - name: SBOM for Hermes
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         env:
           SYFT_FILE_METADATA_SELECTION: none
           SYFT_RELATIONSHIPS_PACKAGE_FILE_OWNERSHIP: "false"
@@ -253,7 +253,7 @@ jobs:
           upload-artifact: false
 
       - name: SBOM for signal-cli
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         env:
           SYFT_FILE_METADATA_SELECTION: none
           SYFT_RELATIONSHIPS_PACKAGE_FILE_OWNERSHIP: "false"
@@ -264,7 +264,7 @@ jobs:
           upload-artifact: false
 
       - name: SBOM for the SSH sandbox
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         env:
           SYFT_FILE_METADATA_SELECTION: none
           SYFT_RELATIONSHIPS_PACKAGE_FILE_OWNERSHIP: "false"
