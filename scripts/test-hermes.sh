@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tests a built Hermes image: its Debian package database is consistent,
-# Hermes starts far enough to report its version, and tirith runs from PATH,
-# where Hermes looks for it before downloading one of its own.
+# Hermes starts far enough to report its version, tirith runs from PATH,
+# where Hermes looks for it before downloading one of its own, and Hermes
+# discovers the DirectSDK provider.
 #
 # It also lists any Debian update still pending, as the daily check would see
 # it. apt-get upgrade holds an update back only when it needs a package
@@ -16,6 +17,8 @@ here=$(dirname "$0")
 docker run --rm --entrypoint sh "$image" -c 'dpkg --audit && apt-get check -qq'
 docker run --rm --entrypoint /opt/hermes/.venv/bin/hermes "$image" --version
 docker run --rm --entrypoint tirith "$image" --version
+docker run --rm -w /opt/hermes --entrypoint /opt/hermes/.venv/bin/python "$image" -c \
+  "import providers, sys; names = [p.name for p in providers.list_providers()]; print('DirectSDK provider found') if 'claude-subscription-directsdk-experimental' in names else sys.exit('DirectSDK provider not found')"
 
 status=$(mktemp)
 trap 'rm -f "$status"' EXIT

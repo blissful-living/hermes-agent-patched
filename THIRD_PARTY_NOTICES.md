@@ -18,6 +18,12 @@ The upstream image also contains software that Hermes bundles (among others Node
 - Licence: [GNU Affero General Public License v3.0](https://github.com/sheeki03/tirith/blob/main/LICENSE-AGPL) (tirith is also offered under a commercial licence, which does not apply here)
 - Source: `tirith --version` in the image names the release; its complete corresponding source is at `https://github.com/sheeki03/tirith/tree/v<version>`. The release the image is built from is the `TIRITH_VERSION` argument in [images/hermes-agent-patched/Containerfile](images/hermes-agent-patched/Containerfile).
 
+## Claude Subscription DirectSDK provider
+
+- Image: `ghcr.io/blissful-living/hermes-agent-patched`, at `/opt/hermes/plugins/model-providers/claude-subscription-directsdk-experimental`
+- Upstream: [NousResearch/hermes-plugin-claude-subscription-directsdk](https://github.com/NousResearch/hermes-plugin-claude-subscription-directsdk), at the commit named by `DIRECTSDK_COMMIT` in [images/hermes-agent-patched/Containerfile](images/hermes-agent-patched/Containerfile)
+- Licence: [MIT](https://github.com/NousResearch/hermes-plugin-claude-subscription-directsdk/blob/main/LICENSE), copyright Nous Research and contributors; the licence file is copied beside the plugin
+
 ## signal-cli
 
 - Image: `ghcr.io/blissful-living/signal-cli-distroless`

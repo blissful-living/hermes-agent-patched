@@ -1,5 +1,9 @@
 # The official Hermes Agent release with Debian 13's pending updates applied,
-# and the tirith command scanner that Hermes' dangerous-command checks run.
+# the tirith command scanner that Hermes' dangerous-command checks run, and
+# Nous Research's DirectSDK provider, which runs Hermes on a Claude
+# subscription through the official Claude Code CLI. Claude Code itself is
+# Anthropic's proprietary software and is not redistributed here: the
+# provider needs it installed where the image runs.
 # The release image never runs apt-get upgrade and its build reuses cached
 # layers, so its Debian packages can be months older than the release itself.
 # The upstream image is pinned by digest; Renovate proposes new releases.
@@ -46,10 +50,29 @@ RUN apt-get -o Acquire::Retries=3 update \
  && install -m 0755 tirith /usr/local/bin/tirith \
  && /usr/local/bin/tirith --version
 
+# Nous Research's official Claude Subscription DirectSDK provider plugin,
+# which runs each Hermes turn through the unmodified `claude` CLI. The commit
+# is the one Hermes' plugin catalog pins (plugin-catalog/
+# claude-subscription-directsdk.yaml); git checks that the tree matches it.
+# The repository publishes no releases, so a new commit is adopted by hand
+# once the catalog pins it.
+FROM debian:13-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS directsdk
+ARG DIRECTSDK_COMMIT=4bc79c78031d1a042b5d8a7314ceea283db5c5e2
+WORKDIR /tmp/directsdk
+RUN apt-get -o Acquire::Retries=3 update \
+ && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -y install --no-install-recommends ca-certificates git \
+ && git init -q . \
+ && git fetch -q --depth 1 https://github.com/NousResearch/hermes-plugin-claude-subscription-directsdk.git "$DIRECTSDK_COMMIT" \
+ && git checkout -q FETCH_HEAD \
+ && test "$(git rev-parse HEAD)" = "$DIRECTSDK_COMMIT" \
+ && mkdir /plugin \
+ && cp LICENSE README.md plugin.yaml ./*.py /plugin/ \
+ && rm /plugin/conftest.py
+
 FROM hermes
 
 LABEL org.opencontainers.image.title="hermes-agent-patched" \
-      org.opencontainers.image.description="Unofficial Hermes Agent image with Debian's pending updates applied and the tirith command scanner included. Not affiliated with Nous Research." \
+      org.opencontainers.image.description="Unofficial Hermes Agent image with Debian's pending updates applied, the tirith command scanner and Nous Research's DirectSDK provider. Not affiliated with Nous Research." \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.vendor="Blissful Living Foundation" \
       org.opencontainers.image.url="https://github.com/blissful-living/hermes-agent-patched" \
@@ -68,3 +91,7 @@ RUN apt-get -o Acquire::Retries=3 update \
 # it. tirith keeps its signed threat database under the hermes user's home on
 # the volume and refreshes it itself, at most once a day.
 COPY --from=tirith /usr/local/bin/tirith /usr/local/bin/tirith
+
+# A bundled model provider: Hermes imports it from its install tree, which is
+# root-owned, so the gateway's user cannot change it.
+COPY --from=directsdk /plugin /opt/hermes/plugins/model-providers/claude-subscription-directsdk-experimental
