@@ -10,7 +10,7 @@
 # release is pinned by digest; Renovate proposes new releases.
 ARG BASE=gcr.io/distroless/cc-debian13:nonroot
 
-FROM ghcr.io/asamk/signal-cli:0.14.8-native@sha256:a1dfebf08f0a3ea586153911c8ed3954faf3a32ecb2b19acd2115fe8b1cc7a53 AS upstream
+FROM ghcr.io/asamk/signal-cli:0.14.9-native@sha256:aa9be3e6b177908c045b96448f7139a925798679f53e9874df2967a8ff7d313c AS upstream
 
 # An empty, private directory for the default configuration path; distroless
 # has no shell to create it.
