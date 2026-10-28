@@ -6,7 +6,7 @@
 #
 # Debian's pending updates are applied at every build, as in the Hermes
 # image. The Debian image is pinned by digest; Renovate proposes new builds.
-FROM debian:13-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
+FROM debian:13-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
 
 LABEL org.opencontainers.image.title="hermes-ssh-sandbox" \
       org.opencontainers.image.description="Unofficial SSH sandbox for Hermes Agent's ssh terminal backend, on Debian 13. Not affiliated with Nous Research." \
