@@ -6,7 +6,7 @@
 # Usage: pending-debian-updates.sh <dpkg status file>
 set -euo pipefail
 
-debian_image="debian:13-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a"
+debian_image="debian:13-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2"
 
 status="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 docker run --rm -v "$status:/tmp/status:ro" "$debian_image" sh -c \
